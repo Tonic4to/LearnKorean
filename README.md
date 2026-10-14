@@ -68,3 +68,7 @@ Issues and pull requests are welcome, whether that's new words, better hints, or
 ## Credits
 
 Hangul is shown in the bundled [Gothic A1](https://fonts.google.com/specimen/Gothic+A1) font by HanYang I&C, licensed under the SIL Open Font License 1.1 (see `fonts/OFL.txt`). Gothic A1 draws ㅎ and ㅊ with a flat dash on top instead of the vertical tick some fonts use.
+
+## License
+
+[MIT](LICENSE). The bundled fonts in `fonts/` keep their own license, the SIL Open Font License 1.1.
