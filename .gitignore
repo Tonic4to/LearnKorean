@@ -1,0 +1,32 @@
+# Progress is kept in the browser's localStorage, never on disk.
+# These rules keep any exported/backup progress files and local
+# environment junk out of the repo.
+
+# Personal progress exports or backups
+*progress*.json
+*.backup.json
+/local/
+/private/
+
+# Secrets and local config
+.env
+.env.*
+*.pem
+*.key
+
+# Node (tools/ has no dependencies, but just in case)
+node_modules/
+npm-debug.log*
+
+# Editors and AI assistants
+.vscode/
+.idea/
+*.swp
+*~
+.claude/
+CLAUDE.local.md
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
