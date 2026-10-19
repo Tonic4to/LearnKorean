@@ -423,7 +423,7 @@ table.g-rule tr:last-child td { border-bottom: 0; }
 .gl { position: relative; display: inline-block; border-bottom: 2px dotted #b8c6dc; cursor: help; outline: none; }
 .gl:hover, .gl:focus { border-bottom-color: var(--blue); }
 .gl-tip {
-  display: none; position: absolute; z-index: 20; bottom: calc(100% + 8px); left: 50%; transform: translateX(-50%);
+  display: none; position: fixed; z-index: 20; left: 0; top: 0;
   background: var(--ink); color: #fff; border-radius: 10px; padding: 8px 12px;
   font-family: var(--font); font-size: 15px; font-weight: 400; line-height: 1.4; text-align: left; white-space: nowrap;
   box-shadow: 0 4px 14px rgba(0, 0, 0, 0.18); pointer-events: none;

@@ -6,16 +6,24 @@ var GrammarEx = (function () {
 
   // ---------- glossed text ----------
 
-  // Keep a tooltip inside the window.
+  // Tooltips are position: fixed so the screen's overflow can't clip them.
+  // Centered above the word, kept inside the window, and flipped below it
+  // when there's no room above.
   function placeTip(span) {
     var tip = span.querySelector('.gl-tip');
     if (!tip) return;
-    tip.style.marginLeft = '0px';
-    var r = tip.getBoundingClientRect(), pad = 8, shift = 0;
-    if (r.left < pad) shift = pad - r.left;
-    else if (r.right > window.innerWidth - pad) shift = window.innerWidth - pad - r.right;
-    tip.style.marginLeft = shift + 'px';
+    var w = span.getBoundingClientRect(), t = tip.getBoundingClientRect(), pad = 8, gap = 8;
+    var left = w.left + w.width / 2 - t.width / 2;
+    left = Math.max(pad, Math.min(left, window.innerWidth - pad - t.width));
+    var top = w.top - gap - t.height;
+    if (top < pad) top = w.bottom + gap;
+    tip.style.left = left + 'px';
+    tip.style.top = top + 'px';
   }
+  // Scrolling moves the word under a fixed tooltip, so follow it.
+  window.addEventListener('scroll', function () {
+    Array.prototype.forEach.call(document.querySelectorAll('.gl:hover, .gl:focus'), placeTip);
+  }, { passive: true });
 
   function tipFor(word, next) {
     var g = Grammar.gloss(word, next);
