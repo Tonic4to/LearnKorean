@@ -85,8 +85,9 @@ var Screens = (function () {
   var tab = 'alphabet';
   try { tab = localStorage.getItem(TAB_KEY) || 'alphabet'; } catch (e) { /* ignore */ }
 
+  // which = a tab name; buttons that pass home directly as onclick hand it the click event instead.
   function home(which) {
-    if (which) {
+    if (typeof which === 'string') {
       tab = which;
       try { localStorage.setItem(TAB_KEY, tab); } catch (e) { /* ignore */ }
     }
