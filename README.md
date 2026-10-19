@@ -27,6 +27,7 @@ python3 -m http.server 8000   # then visit http://localhost:8000
 - **Numbers 1–20** (in the Words tab) come in both systems: Sino-Korean (일, 이, 삼…) for dates, money and phone numbers, and native Korean (하나, 둘, 셋…) for counting things, age and hours. Each set starts by teaching how the numbers are built and where they change sound (십육 is said *simnyuk*), then drills them like words.
 - **Words** teaches vocabulary in themed sets: a card for each word, then practice in both directions. Learned words come back for review on a spaced schedule (1 day, 2, 4, 7, 15, then 30 days); a miss starts the word over.
 - **Unlock all rounds** (in the home page footer) lets you skip ahead if you already know the alphabet.
+- **Mark as done**: every round, lesson and word set has an "Already done? Mark as done" link on its first screen, and tapping a locked card offers to mark everything before it as done. Skipped content counts as learned, so it shows up in practice and review. This is handy for catching up on a second device, since progress isn't synced.
 
 Korean answers can be typed with a Korean keyboard, or without one: Latin keys are read as the standard 2-set Korean layout (`gkrtod` → 학생), and there's an on-screen keyboard.
 

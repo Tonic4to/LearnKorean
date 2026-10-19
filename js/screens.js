@@ -16,8 +16,13 @@ var Screens = (function () {
   function backBtn(fn) {
     return h('button', { class: 'btn link', onclick: fn }, [h('span', { class: 'arrow', html: ARROW_LEFT }), 'Back']);
   }
+  // nav.skip adds a link that marks the lesson done without playing it.
   function navRow(nav, label) {
-    return h('div', { class: 'nav' }, [nav.back ? backBtn(nav.back) : null, continueBtn(label, nav.next)]);
+    return h('div', { class: 'nav' }, [
+      nav.back ? backBtn(nav.back) : null,
+      nav.skip ? h('button', { class: 'btn link small', onclick: nav.skip }, 'Already done? Mark as done') : null,
+      continueBtn(label, nav.next)
+    ]);
   }
   function bindNav(nav) {
     App.onKey(function (e) {
@@ -124,8 +129,14 @@ var Screens = (function () {
       var open = done || i <= level + 1;
       var state = done ? 'done' : open ? 'current' : 'locked';
       return h('button', {
-        class: 'round-card ' + state, disabled: !open,
-        onclick: function () { playRound(i); }
+        class: 'round-card ' + state, title: open ? null : 'Mark the rounds before this as done to jump here',
+        onclick: function () {
+          if (!open) {
+            if (!confirm('Mark rounds 1–' + i + ' as done and jump to round ' + (i + 1) + '?')) return;
+            for (var k = 0; k < i; k++) Progress.complete(k);
+          }
+          playRound(i);
+        }
       }, [
         h('span', { class: 'round-num' }, String(i + 1)),
         h('span', { class: 'round-kw ko' }, done ? r.keyword : ''),
@@ -168,13 +179,20 @@ var Screens = (function () {
     runFlow(steps);
   }
 
+  // Marks round i done without playing it and moves on to the next one.
+  function skipRound(i) {
+    Progress.complete(i);
+    if (i + 1 < ROUNDS.length) playRound(i + 1);
+    else home('alphabet');
+  }
+
   function roundIntro(i, nav) {
     var r = ROUNDS[i];
     App.mount(screen('intro', [
       homeLink(),
       h('div', { class: 'round-tag' }, ['ROUND', h('span', { class: 'round-badge' }, String(i + 1))]),
       h('div', { class: 'intro-title' }, ['ROUND ' + NUMBERS[i] + ':', h('b', null, r.parts.join('').toUpperCase())]),
-      navRow({ next: nav.next })
+      navRow({ next: nav.next, skip: Progress.isComplete(i) ? null : function () { skipRound(i); } })
     ], 'center'));
     bindNav({ next: nav.next });
   }
@@ -471,8 +489,15 @@ var Screens = (function () {
       var isDone = Progress.grammarDone(l.id);
       var open = isDone || i === 0 || Progress.grammarDone(LESSONS[i - 1].id);
       return h('button', {
-        class: 'round-card lesson-card ' + (isDone ? 'done' : open ? 'current' : 'locked'), disabled: !open,
-        onclick: function () { playLesson(i); }
+        class: 'round-card lesson-card ' + (isDone ? 'done' : open ? 'current' : 'locked'),
+        title: open ? null : 'Mark the lessons before this as done to jump here',
+        onclick: function () {
+          if (!open) {
+            if (!confirm('Mark lessons 1–' + i + ' as done and jump to lesson ' + (i + 1) + '?')) return;
+            for (var k = 0; k < i; k++) Progress.completeGrammar(LESSONS[k].id);
+          }
+          playLesson(i);
+        }
       }, [
         h('span', { class: 'round-num' }, String(i + 1)),
         h('span', { class: 'lesson-kw ko' }, l.title),
@@ -506,13 +531,19 @@ var Screens = (function () {
     runFlow(steps);
   }
 
+  function skipLesson(i) {
+    Progress.completeGrammar(LESSONS[i].id);
+    if (i + 1 < LESSONS.length) playLesson(i + 1);
+    else home('grammar');
+  }
+
   function lessonIntro(i, nav) {
     var l = LESSONS[i];
     App.mount(screen('intro', [
       homeLink(),
       h('div', { class: 'round-tag' }, ['LESSON', h('span', { class: 'round-badge' }, String(i + 1))]),
       h('div', { class: 'intro-title lesson-title' }, [l.name.toUpperCase() + ':', h('b', { class: 'ko' }, l.title)]),
-      navRow({ next: nav.next })
+      navRow({ next: nav.next, skip: Progress.grammarDone(l.id) ? null : function () { skipLesson(i); } })
     ], 'center'));
     bindNav({ next: nav.next });
   }
@@ -619,10 +650,22 @@ var Screens = (function () {
   }
 
   // Sets with teaching cards (numbers) start with those instead of the word list.
+  // Skipped words still go on the review schedule, so they show up in review.
+  function skipSet(set) {
+    Progress.completeVocab(set.id, keysOf(set));
+    var next = VOCAB_SETS[VOCAB_SETS.indexOf(set) + 1];
+    if (next && setOpen(next) && !Progress.vocabDone(next.id)) playSet(next);
+    else home('words');
+  }
+
   function playSet(set) {
     var steps = [], result = null, words = Curriculum.setWords(set);
-    if (set.cards) set.cards.forEach(function (c) { steps.push(function (nav) { teachCard(set, c, nav); }); });
-    else steps.push(function (nav) { setIntro(set, nav); });
+    function withSkip(nav, first) {
+      if (!first || Progress.vocabDone(set.id)) return nav;
+      return Object.assign({}, nav, { skip: function () { skipSet(set); } });
+    }
+    if (set.cards) set.cards.forEach(function (c, k) { steps.push(function (nav) { teachCard(set, c, withSkip(nav, k === 0)); }); });
+    else steps.push(function (nav) { setIntro(set, withSkip(nav, true)); });
     words.forEach(function (w, k) { steps.push(function (nav) { wordCard(w, k, words.length, nav, set); }); });
     steps.push(function (nav) {
       exerciseScreen(Exercises.wordSetSession(set), {
