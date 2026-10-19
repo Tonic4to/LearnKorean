@@ -76,7 +76,46 @@ var Screens = (function () {
 
   // ---------- home ----------
 
-  function home() {
+  var TAB_KEY = 'hangul-tab';
+  var tab = 'alphabet';
+  try { tab = localStorage.getItem(TAB_KEY) || 'alphabet'; } catch (e) { /* ignore */ }
+
+  function home(which) {
+    if (which) {
+      tab = which;
+      try { localStorage.setItem(TAB_KEY, tab); } catch (e) { /* ignore */ }
+    }
+    var tabs = h('div', { class: 'tabs', role: 'tablist' }, [['alphabet', 'Alphabet'], ['grammar', 'Grammar'], ['words', 'Words']].map(function (t) {
+      return h('button', {
+        class: 'tab' + (tab === t[0] ? ' on' : ''), role: 'tab', 'aria-selected': tab === t[0] ? 'true' : 'false',
+        onclick: function () { home(t[0]); }
+      }, t[1]);
+    }));
+    var body = tab === 'grammar' ? grammarHome() : tab === 'words' ? wordsHome() : alphabetHome();
+
+    var footer = h('div', { class: 'footer' }, [
+      sfxToggle(true),
+      h('button', {
+        class: 'btn link small', onclick: function () {
+          if (confirm('Mark every round as finished? Use this if you already know the alphabet.')) { Progress.unlockAll(); home(); }
+        }
+      }, 'Unlock all rounds'),
+      h('button', {
+        class: 'btn link small', onclick: function () {
+          if (confirm('Erase all progress?')) { Progress.reset(); home(); }
+        }
+      }, 'Reset progress')
+    ]);
+
+    App.mount(screen('home', [h('div', { class: 'eyebrow' }, 'LEARN KOREAN'), tabs, body, footer]));
+    App.onKey(null);
+  }
+
+  function action(title, sub, fn, disabled) {
+    return h('button', { class: 'action', disabled: !!disabled, onclick: fn }, [h('b', null, title), h('span', null, sub)]);
+  }
+
+  function alphabetHome() {
     var level = Progress.level();
     var known = level >= 0 ? Curriculum.knownAt(level).length : 0;
 
@@ -95,36 +134,15 @@ var Screens = (function () {
       ]);
     });
 
-    var vocabCount = Exercises.vocabWords(level).length;
-    var actions = h('div', { class: 'actions' }, [
-      h('button', { class: 'action', disabled: level < 0, onclick: function () { practice(); } }, [h('b', null, 'Practice'), h('span', null, 'Mixed review of everything you know')]),
-      h('button', { class: 'action', disabled: level < 0, onclick: function () { quiz(); } }, [h('b', null, 'Mock quiz'), h('span', null, '20 questions, scored')]),
-      h('button', { class: 'action', onclick: function () { vocabList(); } }, [h('b', null, 'Textbook words'), h('span', null, 'Yonsei ch. 4–7 · ' + vocabCount + ' unlocked')]),
-      h('button', { class: 'action', onclick: function () { chart({}); } }, [h('b', null, 'Letter chart'), h('span', null, 'Review any letter you’ve learned')])
-    ]);
-
-    var footer = h('div', { class: 'footer' }, [
-      sfxToggle(true),
-      h('button', {
-        class: 'btn link small', onclick: function () {
-          if (confirm('Mark every round as finished? Use this if you already know the alphabet.')) { Progress.unlockAll(); home(); }
-        }
-      }, 'Unlock all rounds'),
-      h('button', {
-        class: 'btn link small', onclick: function () {
-          if (confirm('Erase all progress?')) { Progress.reset(); home(); }
-        }
-      }, 'Reset progress')
-    ]);
-
-    App.mount(screen('home', [
-      h('div', { class: 'eyebrow' }, 'LEARN HANGUL'),
+    return [
       h('h1', { class: 'lead' }, known ? ['You know ', h('b', null, String(known)), ' of 40 letters.'] : 'Start with round one — no Korean needed.'),
       h('div', { class: 'rounds' }, rounds),
-      actions,
-      footer
-    ]));
-    App.onKey(null);
+      h('div', { class: 'actions' }, [
+        action('Practice', 'Mixed review of everything you know', function () { practice(); }, level < 0),
+        action('Mock quiz', '20 questions, scored', function () { quiz(); }, level < 0),
+        action('Letter chart', 'Review any letter you’ve learned', function () { chart({}); })
+      ])
+    ];
   }
 
   // ---------- round flow ----------
@@ -348,7 +366,8 @@ var Screens = (function () {
       function next() { idx++; show(); }
       foot.appendChild(h('div', { class: 'feedback ' + (ok ? 'ok' : 'bad') }, [
         h('div', { class: 'fb-text' }, [
-          h('strong', null, ok ? 'Correct!' : 'Not quite.'),
+          h('strong', null, fb.title || (ok ? 'Correct!' : 'Not quite.')),
+          fb.answerNode ? h('div', { class: 'fb-answer' }, fb.answerNode) : null,
           fb.answer ? h('div', { class: 'fb-answer', html: fb.answer }) : null,
           fb.note ? h('div', { class: 'fb-note', html: fb.note }) : null
         ]),
@@ -365,9 +384,10 @@ var Screens = (function () {
 
   // ---------- practice, quiz, textbook vocab ----------
 
-  function results(title, res, again) {
+  function results(title, res, again, againLabel) {
     if (res.correct === res.total) Sfx.complete();
     var misses = res.misses.map(function (it) {
+      if (it.type === 'grammar') return GrammarEx.missLine(it);
       if (it.word) return h('li', { html: '<span class="ko">' + it.word.ko + '</span> · <b>' + it.word.rom + '</b> · ' + it.word.en });
       if (it.block) return h('li', { html: '<span class="ko">' + it.block + '</span> · <b>' + Hangul.romanizeBlock(it.block) + '</b>' });
       return h('li', { html: '<span class="ko ' + kindOf(it.j) + '">' + it.j + '</span> · <b>' + Letters.label(it.j) + '</b>' });
@@ -377,7 +397,7 @@ var Screens = (function () {
       h('div', { class: 'eyebrow' }, title),
       h('p', { class: 'score' }, [h('b', null, String(res.correct)), ' / ' + res.total]),
       misses.length ? h('div', null, [h('p', { class: 'muted' }, 'Worth another look:'), h('ul', { class: 'misses' }, misses)]) : h('p', { class: 'lead' }, 'Perfect!'),
-      h('div', { class: 'nav' }, [h('button', { class: 'btn link', onclick: home }, 'Home'), continueBtn('Go again', again)])
+      h('div', { class: 'nav' }, [h('button', { class: 'btn link', onclick: home }, 'Home'), continueBtn(againLabel || 'Go again', again)])
     ]));
     bindNav({ next: again });
   }
@@ -432,6 +452,245 @@ var Screens = (function () {
     ]));
     if (unlocked.length >= 4) bindNav({ next: vocabPractice });
     else App.onKey(null);
+  }
+
+  // ---------- grammar ----------
+
+  function lessonsDone() { return LESSONS.filter(function (l) { return Progress.grammarDone(l.id); }).map(function (l) { return l.id; }); }
+
+  function grammarHome() {
+    if (!Progress.alphabetDone()) {
+      return [
+        h('h1', { class: 'lead' }, 'Grammar starts once you can read.'),
+        h('p', { class: 'muted' }, 'Finish all ' + ROUNDS.length + ' alphabet rounds first. If you already read Hangul, use “Unlock all rounds” below.'),
+        h('div', { class: 'nav left' }, continueBtn('Go to the alphabet', function () { home('alphabet'); }))
+      ];
+    }
+    var done = lessonsDone();
+    var cards = LESSONS.map(function (l, i) {
+      var isDone = Progress.grammarDone(l.id);
+      var open = isDone || i === 0 || Progress.grammarDone(LESSONS[i - 1].id);
+      return h('button', {
+        class: 'round-card lesson-card ' + (isDone ? 'done' : open ? 'current' : 'locked'), disabled: !open,
+        onclick: function () { playLesson(i); }
+      }, [
+        h('span', { class: 'round-num' }, String(i + 1)),
+        h('span', { class: 'lesson-kw ko' }, l.title),
+        h('span', { class: 'round-rom' }, l.name),
+        h('span', { class: 'round-sub', html: Grammar.koWrap(l.gist) })
+      ]);
+    });
+    return [
+      h('h1', { class: 'lead' }, done.length
+        ? ['You’ve finished ', h('b', null, String(done.length)), ' of ' + LESSONS.length + ' grammar lessons.']
+        : 'Your first sentences: start with lesson one.'),
+      h('div', { class: 'rounds lessons' }, cards),
+      h('div', { class: 'actions' }, [
+        action('Grammar practice', 'Mixed sentences from finished lessons', grammarPractice, !done.length),
+        action('Cheat sheet', 'Every rule on one page', cheatSheet)
+      ])
+    ];
+  }
+
+  function playLesson(i) {
+    var l = LESSONS[i], steps = [], result = null;
+    steps.push(function (nav) { lessonIntro(i, nav); });
+    l.cards.forEach(function (c) { steps.push(function (nav) { grammarCard(l, c, nav); }); });
+    steps.push(function (nav) {
+      exerciseScreen(GrammarEx.lessonSession(l), {
+        label: 'LESSON ' + (i + 1), requeue: true,
+        onFinish: function (res) { Progress.completeGrammar(l.id); result = res; nav.next(); }
+      });
+    });
+    steps.push(function () { lessonComplete(i, result); });
+    runFlow(steps);
+  }
+
+  function lessonIntro(i, nav) {
+    var l = LESSONS[i];
+    App.mount(screen('intro', [
+      homeLink(),
+      h('div', { class: 'round-tag' }, ['LESSON', h('span', { class: 'round-badge' }, String(i + 1))]),
+      h('div', { class: 'intro-title lesson-title' }, [l.name.toUpperCase() + ':', h('b', { class: 'ko' }, l.title)]),
+      navRow({ next: nav.next })
+    ], 'center'));
+    bindNav({ next: nav.next });
+  }
+
+  function grammarCard(l, card, nav) {
+    App.mount(screen('note grammar-note', [
+      homeLink(),
+      h('div', { class: 'eyebrow' }, [h('span', { class: 'ko' }, l.title), ' · ' + l.name.toUpperCase()]),
+      h('h2', { html: Grammar.koWrap(card.title) }),
+      GrammarEx.cardBody(card),
+      navRow(nav)
+    ], 'right'));
+    bindNav(nav);
+  }
+
+  function lessonComplete(i, res) {
+    var l = LESSONS[i], last = i + 1 >= LESSONS.length;
+    var next = last ? function () { home('grammar'); } : function () { playLesson(i + 1); };
+    Sfx.complete();
+    App.mount(screen('complete', [
+      homeLink(),
+      h('div', { class: 'eyebrow' }, 'LESSON COMPLETE!'),
+      h('p', { class: 'lead' }, ['You can now use ', h('b', { class: 'ko' }, l.title), ' (' + l.name.toLowerCase() + ').']),
+      res ? h('p', { class: 'muted' }, res.correct + ' of ' + res.total + ' right on the first try.') : null,
+      GrammarEx.ruleTable(l.rule),
+      h('div', { class: 'nav' }, [
+        h('button', { class: 'btn link', onclick: function () { home('grammar'); } }, 'Lessons'),
+        continueBtn(last ? 'Practice' : 'Next lesson', last ? grammarPractice : next)
+      ])
+    ]));
+    bindNav({ next: last ? grammarPractice : next });
+  }
+
+  function grammarPractice() {
+    var ids = lessonsDone();
+    if (!ids.length) return home('grammar');
+    exerciseScreen(GrammarEx.practiceSession(ids, 12), {
+      label: 'GRAMMAR', requeue: true,
+      onFinish: function (res) { results('GRAMMAR PRACTICE', res, grammarPractice); }
+    });
+  }
+
+  function cheatSheet() {
+    App.mount(screen('cheat', [
+      homeLink(),
+      h('div', { class: 'eyebrow' }, 'GRAMMAR CHEAT SHEET'),
+      h('p', { class: 'lead' }, 'Every pattern so far, with an example.'),
+      LESSONS.map(function (l, i) {
+        var ex = l.cards[0].examples && l.cards[0].examples[0];
+        return h('section', { class: 'cheat-item' }, [
+          h('h3', null, [h('span', { class: 'cheat-num' }, String(i + 1)), h('span', { class: 'ko' }, l.title), ' · ' + l.name]),
+          GrammarEx.ruleTable(l.rule),
+          ex ? h('div', { class: 'g-example' }, [h('div', { class: 'g-ko' }, GrammarEx.line(ex[0])), h('div', { class: 'g-en' }, ex[1])]) : null
+        ]);
+      }),
+      h('div', { class: 'nav' }, continueBtn('Done', function () { home('grammar'); }))
+    ]));
+    bindNav({ next: function () { home('grammar'); } });
+  }
+
+  // ---------- words ----------
+
+  function keysOf(set) { return Curriculum.setWords(set).map(function (w) { return w.key; }); }
+  function setOpen(set) {
+    var level = Progress.level();
+    return Curriculum.setWords(set).every(function (w) { return w.round <= level; });
+  }
+  // Keys of every word in a learned set.
+  function learnedWords() {
+    var out = [];
+    VOCAB_SETS.forEach(function (s) { if (Progress.vocabDone(s.id)) out = out.concat(keysOf(s)); });
+    return out.filter(function (k, i) { return out.indexOf(k) === i; });
+  }
+
+  function wordsHome() {
+    var learned = learnedWords(), due = Progress.due(learned);
+    var cards = VOCAB_SETS.map(function (set, i) {
+      var done = Progress.vocabDone(set.id), open = done || setOpen(set);
+      var words = Curriculum.setWords(set), d = done ? Progress.due(keysOf(set)).length : 0;
+      return h('button', {
+        class: 'round-card lesson-card ' + (done ? 'done' : open ? 'current' : 'locked'), disabled: !open,
+        onclick: function () { playSet(set); }
+      }, [
+        h('span', { class: 'round-num' }, String(i + 1)),
+        h('span', { class: 'lesson-kw ko' }, open ? words[0].ko : ''),
+        h('span', { class: 'round-rom' }, set.title),
+        h('span', { class: 'round-sub' }, words.length + (set.numbers ? ' numbers' : ' words') +
+          (done ? (d ? ' · ' + d + ' due' : ' · learned') : open ? '' : ' · finish the alphabet'))
+      ]);
+    });
+    var reviewSub = !learned.length ? 'Learn a set first'
+      : due.length ? due.length + ' word' + (due.length === 1 ? '' : 's') + ' due now'
+        : 'Nothing due · practice your weakest words';
+    return [
+      h('h1', { class: 'lead' }, learned.length
+        ? ['You’ve learned ', h('b', null, String(learned.length)), ' words.', due.length ? [' ', h('b', null, String(due.length)), ' are due for review.'] : '']
+        : 'Learn words in small sets, then review them as they come due.'),
+      h('div', { class: 'rounds lessons' }, cards),
+      h('div', { class: 'actions' }, [
+        action('Review words', reviewSub, reviewWords, !learned.length),
+        action('Textbook words', 'Yonsei ch. 4–7 · ' + Exercises.vocabWords(Progress.level()).length + ' unlocked', function () { vocabList(); })
+      ])
+    ];
+  }
+
+  // Sets with teaching cards (numbers) start with those instead of the word list.
+  function playSet(set) {
+    var steps = [], result = null, words = Curriculum.setWords(set);
+    if (set.cards) set.cards.forEach(function (c) { steps.push(function (nav) { teachCard(set, c, nav); }); });
+    else steps.push(function (nav) { setIntro(set, nav); });
+    words.forEach(function (w, k) { steps.push(function (nav) { wordCard(w, k, words.length, nav, set); }); });
+    steps.push(function (nav) {
+      exerciseScreen(Exercises.wordSetSession(set), {
+        label: set.title.toUpperCase(), requeue: true,
+        onFinish: function (res) { Progress.completeVocab(set.id, keysOf(set)); result = res; nav.next(); }
+      });
+    });
+    steps.push(function () { results(set.title.toUpperCase() + ' · LEARNED', result, function () { playSet(set); }, 'Learn again'); });
+    runFlow(steps);
+  }
+
+  function teachCard(set, card, nav) {
+    App.mount(screen('note grammar-note', [
+      homeLink(),
+      h('div', { class: 'eyebrow' }, set.title.toUpperCase()),
+      h('h2', { html: Grammar.koWrap(card.title) }),
+      GrammarEx.cardBody(card),
+      navRow(nav)
+    ], 'right'));
+    bindNav(nav);
+  }
+
+  function setIntro(set, nav) {
+    var words = Curriculum.setWords(set);
+    App.mount(screen('vocab-page', [
+      homeLink(),
+      h('div', { class: 'eyebrow' }, 'WORD SET'),
+      h('p', { class: 'lead' }, [set.title, ': ', h('b', null, String(words.length)), ' words']),
+      h('div', { class: 'vocab-list' }, words.map(function (w) {
+        return h('div', { class: 'vocab-row' }, [
+          h('span', { class: 'ko vocab-ko' }, w.ko),
+          h('span', { class: 'vocab-rom' }, w.rom),
+          h('span', { class: 'vocab-en' }, w.en)
+        ]);
+      })),
+      h('p', { class: 'muted' }, 'You’ll see each word on its own card, then practice them both ways. After that they come back for review: in a day, then a few days, then weeks.'),
+      navRow(nav, 'Start')
+    ]));
+    bindNav(nav);
+  }
+
+  function wordCard(w, k, n, nav, set) {
+    var mr = Romanize.mr(w.say || w.ko), isNum = set && set.numbers;
+    App.mount(screen('word-card', [
+      homeLink(),
+      h('div', { class: 'eyebrow dark' }, (isNum ? 'NUMBER ' : 'WORD ') + (k + 1) + ' OF ' + n),
+      isNum ? h('div', { class: 'wc-num' }, w.en) : null,
+      h('div', { class: 'wc-row' }, [h('div', { class: 'wc-ko ko' }, w.ko), speakButton(w.ko)]),
+      h('div', { class: 'wc-rom' }, [w.rom, mr !== w.rom ? h('span', { class: 'muted' }, ' · ' + mr) : null]),
+      isNum ? null : h('p', { class: 'wc-en' }, w.en),
+      w.say ? h('p', { class: 'muted', html: 'Said like <span class="ko">' + w.say + '</span>, not the way it’s spelled.' }) : null,
+      w.ch ? h('p', { class: 'muted' }, 'From Yonsei Korean, chapter ' + w.ch + '.') : null,
+      navRow(nav, k + 1 < n ? 'Next' : 'Practice')
+    ], 'left'));
+    bindNav(nav);
+  }
+
+  function reviewWords() {
+    var learned = learnedWords();
+    if (!learned.length) return home('words');
+    var list = Progress.due(learned);
+    if (!list.length) {
+      list = U.shuffle(learned).sort(function (a, b) { return Progress.box(a) - Progress.box(b); });
+    }
+    exerciseScreen(Exercises.reviewSession(list.slice(0, 12)), {
+      label: 'REVIEW', requeue: true,
+      onFinish: function (res) { results('WORD REVIEW', res, reviewWords); }
+    });
   }
 
   return { home: home, WAVE: WAVE };

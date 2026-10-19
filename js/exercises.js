@@ -66,7 +66,9 @@ var Exercises = (function () {
     return { type: 'listen', block: b, options: U.shuffle(opts), keys: blockKeys(b) };
   }
   function readWord(ctx, w) {
-    return { type: 'readWord', word: w, text: w.ko, rom: w.rom, alt: w.alt, keys: ['W:' + w.ko] };
+    // Literal spellings are fine too for words said unlike they're written (십육: simnyuk / sibyuk).
+    var alt = w.say ? w.alt.concat([Romanize.rr(w.ko)]) : w.alt;
+    return { type: 'readWord', word: w, text: w.say || w.ko, rom: w.rom, alt: alt, keys: [w.key] };
   }
   function buildWord(ctx, w, fromMeaning) {
     var seq = Hangul.inputSequence(w.ko);
@@ -74,12 +76,23 @@ var Exercises = (function () {
     var decoys = U.sample(ctx.known.filter(function (j) { return own.indexOf(j) < 0; }), Math.min(4, Math.max(2, 9 - own.length)));
     var palette = U.shuffle(own.concat(decoys));
     if (seq.indexOf(' ') >= 0) palette.push(' ');
-    return { type: fromMeaning ? 'buildMeaning' : 'buildWord', word: w, palette: palette, keys: ['W:' + w.ko] };
+    return { type: fromMeaning ? 'buildMeaning' : 'buildWord', word: w, palette: palette, keys: [w.key] };
   }
-  function meaningWord(ctx, w) {
-    var pool = Curriculum.words.filter(function (x) { return x.en !== w.en; });
-    var opts = [w.en].concat(U.sample(pool, 3).map(function (x) { return x.en; }));
-    return { type: 'meaningWord', word: w, options: U.shuffle(opts), keys: ['W:' + w.ko] };
+  // Korean → pick the meaning. Decoys come from `near` (the same set) first.
+  function meaningWord(ctx, w, near) {
+    var opts = [w.en];
+    U.shuffle(near || []).concat(U.shuffle(Curriculum.words)).forEach(function (x) {
+      if (opts.length < 4 && opts.indexOf(x.en) < 0) opts.push(x.en);
+    });
+    return { type: 'meaningWord', word: w, options: U.shuffle(opts), keys: [w.key] };
+  }
+  // English → pick the Korean word. Decoys come from `near` (the same set) first.
+  function wordFromMeaning(ctx, w, near) {
+    function ok(x) { return x.en !== w.en && x.ko !== w.ko; }
+    var pool = U.shuffle((near || []).filter(ok)).concat(U.shuffle(ctx.words.filter(ok)));
+    var opts = [w];
+    pool.forEach(function (x) { if (opts.length < 4 && opts.indexOf(x) < 0) opts.push(x); });
+    return { type: 'wordFromMeaning', word: w, options: U.shuffle(opts), keys: [w.key] };
   }
 
   // ---------- renderers ----------
@@ -235,6 +248,14 @@ var Exercises = (function () {
           item.options, function (o) { return o === item.word.en; },
           function (o) { return h('span', null, o); },
           api, function () { return { answer: wordAnswer(item.word) }; }, 'text-opt');
+      case 'wordFromMeaning':
+        return multipleChoice('Which word means this?',
+          h('div', { class: 'prompt-rom' }, item.word.en),
+          item.options, function (o) { return o === item.word; },
+          function (o) { return h('span', { class: 'ko' }, o.ko); },
+          api, function () { return { answer: wordAnswer(item.word) }; }, 'word-opt');
+      case 'grammar':
+        return GrammarEx.render(item, api);
       case 'listen': {
         setTimeout(function () { Speech.say(item.block); }, 250);
         return multipleChoice('Which block do you hear?',
@@ -328,8 +349,30 @@ var Exercises = (function () {
     });
   }
 
+  // Learning a word set: every word both ways (Korean → English, then
+  // English → Korean), then spelling a few from memory.
+  function wordSetSession(set) {
+    var ctx = roundContext(Progress.level());
+    var words = Curriculum.setWords(set);
+    var first = U.shuffle(words).map(function (w) { return meaningWord(ctx, w, words); });
+    var second = U.shuffle(words).map(function (w) { return wordFromMeaning(ctx, w, words); });
+    var third = U.sample(words, Math.min(4, words.length)).map(function (w) { return buildWord(ctx, w, true); });
+    return first.concat(second, third);
+  }
+
+  // Spaced review: one exercise per word, a different kind each time.
+  function reviewSession(keys) {
+    var ctx = roundContext(Progress.level());
+    var kinds = [meaningWord, wordFromMeaning, function (c, w) { return buildWord(c, w, true); }, readWord];
+    return U.shuffle(keys.map(Curriculum.wordByKey)).map(function (w, k) {
+      var near = w.set ? Curriculum.setWords(Curriculum.setById(w.set)) : null;
+      return kinds[(k + Progress.box(w.key)) % kinds.length](ctx, w, near);
+    });
+  }
+
   return {
     render: render, roundSession: roundSession, practiceSession: practiceSession,
-    quizSession: quizSession, vocabSession: vocabSession, vocabWords: vocabWords
+    quizSession: quizSession, vocabSession: vocabSession, vocabWords: vocabWords,
+    wordSetSession: wordSetSession, reviewSession: reviewSession
   };
 })();

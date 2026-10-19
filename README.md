@@ -1,6 +1,6 @@
-# Learn Korean (Hangul)
+# Learn Korean
 
-A small, fully offline web app for learning the Korean alphabet one round at a time, modeled on letslearnhangul.com. No account, no server, no build step and no tracking: it's plain HTML, CSS and JavaScript.
+A small, fully offline web app for learning Korean: the alphabet one round at a time (modeled on letslearnhangul.com), then first grammar and vocabulary. No account, no server, no build step and no tracking: it's plain HTML, CSS and JavaScript.
 
 ## Getting started
 
@@ -23,15 +23,20 @@ python3 -m http.server 8000   # then visit http://localhost:8000
 - **Practice** mixes everything you've learned so far and brings back what you get wrong more often.
 - **Mock quiz** gives you 20 scored questions.
 - **Textbook words** lists vocabulary from Yonsei Korean ch. 4–7 and drills it once you know the letters.
+- **Grammar** (opens after the alphabet) has eight lessons on the patterns from Yonsei ch. 4–7: 은/는, 이에요/예요, 이/가, 도, 이/그/저, 이것/그것/저것, 있다/없다 and 아니에요. Each lesson explains the rule, then drills it four ways: pick the right particle, put a sentence together from pieces, translate from English, and write a sentence for a situation. Typed sentences are checked for grammar (wrong particle form, missing particle, verb not at the end…) with an explanation of what went wrong. Small spelling and spacing slips are pointed out but still count as correct, since the grammar is the focus. Hover over or tap any Korean word to see how it's read and what each part means. There's also a cheat sheet and mixed grammar practice.
+- **Numbers 1–20** (in the Words tab) come in both systems: Sino-Korean (일, 이, 삼…) for dates, money and phone numbers, and native Korean (하나, 둘, 셋…) for counting things, age and hours. Each set starts by teaching how the numbers are built and where they change sound (십육 is said *simnyuk*), then drills them like words.
+- **Words** teaches vocabulary in themed sets: a card for each word, then practice in both directions. Learned words come back for review on a spaced schedule (1 day, 2, 4, 7, 15, then 30 days); a miss starts the word over.
 - **Unlock all rounds** (in the home page footer) lets you skip ahead if you already know the alphabet.
 
-Typed answers can be in Revised Romanization (gimchi, bulgogi) or the older McCune–Reischauer system (kimch'i / kimchi, pulgogi). The ŏ/ŭ marks and apostrophes are optional.
+Korean answers can be typed with a Korean keyboard, or without one: Latin keys are read as the standard 2-set Korean layout (`gkrtod` → 학생), and there's an on-screen keyboard.
+
+Typed romanization answers can be in Revised Romanization (gimchi, bulgogi) or the older McCune–Reischauer system (kimch'i / kimchi, pulgogi). The ŏ/ŭ marks and apostrophes are optional.
 
 A chime plays on correct answers. You can turn it off on the home page or with the speaker icon during exercises. Pronunciation buttons only show up if your system has a Korean text-to-speech voice installed.
 
 ## Your progress
 
-Progress (finished rounds and how often you miss each letter or word) is saved in your browser's `localStorage` and stays on your device. It is never written to the project folder, so it can't end up in a commit. To start over, clear the site data for the page in your browser.
+Progress (finished rounds and lessons, how often you miss each item, and when each word is due for review) is saved in your browser's `localStorage` and stays on your device. It is never written to the project folder, so it can't end up in a commit. To start over, clear the site data for the page in your browser.
 
 ## Editing content
 
@@ -40,11 +45,15 @@ Progress (finished rounds and how often you miss each letter or word) is saved i
 | `js/data/rounds.js` | Lesson order, keywords, teaching notes |
 | `js/data/words.js` | Word bank (tag textbook words with `{ ch: N }`) |
 | `js/data/letters.js` | Letter descriptions and memory hints |
+| `js/data/grammar.js` | Grammar lessons, exercises, particles and extra glossary words |
+| `js/data/vocab.js` | Word sets for the Words tab |
+| `js/data/numbers.js` | Number sets (1–20, both systems) with their teaching cards |
 
 After editing, run the checks (Node.js, no dependencies):
 
 ```sh
-node tools/validate.js   # checks that no Hangul appears before its letters are taught
+node tools/validate.js   # checks that no Hangul appears before its letters are taught,
+                         # and that every grammar sentence glosses and uses the right particle forms
 node tools/test.js       # tests the Hangul building/splitting logic
 ```
 
@@ -55,7 +64,7 @@ node tools/test.js       # tests the Hangul building/splitting logic
 ```
 index.html        entry point
 css/style.css     styles
-js/               app logic (hangul.js, romanize.js, exercises.js, screens.js, …)
+js/               app logic (hangul.js, romanize.js, grammar.js, exercises.js, screens.js, …)
 js/data/          lesson content
 fonts/            Gothic A1 font + license
 tools/            validation and tests (Node)

@@ -189,5 +189,11 @@ var WORDS = [
   ['교실', 'gyosil', 'classroom', { ch: 7 }],
   ['학교', 'hakgyo', 'school', { ch: 7 }],
   ['식당', 'sikdang', 'restaurant; cafeteria', { ch: 7 }],
-  ['집', 'jip', 'house; home', { ch: 7 }]
+  ['집', 'jip', 'house; home', { ch: 7 }],
+
+  // Used in the grammar lessons
+  ['시간', 'sigan', 'time'],
+  ['돈', 'don', 'money'],
+  ['우산', 'usan', 'umbrella'],
+  ['가수', 'gasu', 'singer']
 ];

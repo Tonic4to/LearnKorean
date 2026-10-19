@@ -3,7 +3,7 @@ const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
 
-const FILES = ['js/util.js', 'js/hangul.js', 'js/romanize.js', 'js/data/letters.js', 'js/data/rounds.js', 'js/data/words.js', 'js/curriculum.js'];
+const FILES = ['js/util.js', 'js/hangul.js', 'js/romanize.js', 'js/data/letters.js', 'js/data/rounds.js', 'js/data/words.js', 'js/data/grammar.js', 'js/data/numbers.js', 'js/data/vocab.js', 'js/curriculum.js', 'js/grammar.js', 'js/koinput.js'];
 
 module.exports = function load() {
   const ctx = { console };

@@ -1,5 +1,5 @@
 // Checks the lesson data. Run: node tools/validate.js [--verbose]
-const { Hangul, Romanize, LETTERS, ROUNDS, Curriculum } = require('./load')();
+const { Hangul, Romanize, LETTERS, ROUNDS, Curriculum, Grammar, LESSONS, ENDINGS, VOCAB_SETS } = require('./load')();
 const verbose = process.argv.includes('--verbose');
 const errors = [], warnings = [];
 
@@ -55,6 +55,67 @@ ROUNDS.forEach((r, i) => {
 });
 const tb = Curriculum.textbook();
 console.log(`\nTextbook words: ${tb.length}`);
+
+// Grammar lessons: every word glosses, every particle matches its noun,
+// and every accepted answer passes its own check.
+function checkSentence(where, text) {
+  Grammar.words(text).forEach(w => {
+    const p = Grammar.parse(w);
+    if (p.unknown) errors.push(`${where}: "${w}" isn't in words.js or GRAMMAR_WORDS, so it can't be glossed`);
+    p.ends.forEach((e, k) => {
+      const before = p.stem + p.ends.slice(0, k).join('');
+      if (ENDINGS[e].bad) errors.push(`${where}: "${w}" uses the misspelling ${e}`);
+      else if (!Grammar.allomorphOK(before, e)) errors.push(`${where}: "${w}" should use ${Grammar.reason(before, e) ? 'the other form' : e} after ${before}`);
+    });
+  });
+  const r = Grammar.check(text, [text]);
+  if (!r.exact) errors.push(`${where}: "${text}" doesn't pass its own check`);
+}
+const ids = new Set();
+LESSONS.forEach((l, i) => {
+  const label = `Lesson ${i + 1} (${l.title})`;
+  if (ids.has(l.id)) errors.push(`${label}: duplicate id ${l.id}`);
+  ids.add(l.id);
+  l.cards.forEach(c => (c.examples || []).forEach(e => checkSentence(`${label} example`, e[0])));
+  l.exercises.forEach((ex, k) => {
+    const where = `${label} exercise ${k + 1}`;
+    if (ex.pick) {
+      if (ex.pick.split('_').length !== 2) errors.push(`${where}: needs exactly one _`);
+      if (!ex.opts.includes(ex.ans)) errors.push(`${where}: answer ${ex.ans} isn't one of the options`);
+      if (new Set(ex.opts).size !== ex.opts.length) errors.push(`${where}: repeated option`);
+      if (!ex.en) errors.push(`${where}: needs an English cue`);
+      checkSentence(where, ex.pick.replace('_', ex.ans));
+    } else if (ex.arrange) {
+      if (!ex.en) errors.push(`${where}: needs an English cue`);
+      checkSentence(where, ex.arrange);
+    } else if (ex.translate || ex.write) {
+      if (!ex.ko || !ex.ko.length) errors.push(`${where}: needs accepted answers`);
+      else ex.ko.forEach(a => checkSentence(where, a));
+    } else errors.push(`${where}: unknown exercise format`);
+  });
+});
+console.log(`Grammar lessons: ${LESSONS.length} (${LESSONS.reduce((n, l) => n + l.exercises.length, 0)} exercises)`);
+
+const setIds = new Set();
+VOCAB_SETS.forEach(set => {
+  if (setIds.has(set.id)) errors.push(`Word set ${set.id} is listed twice`);
+  setIds.add(set.id);
+  if (set.items) {
+    set.items.forEach(([n, ko, rom, say]) => {
+      const generated = Romanize.rr(say || ko);
+      if (generated !== rom) errors.push(`Number set "${set.title}": ${ko} is spelled "${rom}" but the pronunciation rules give "${generated}"`);
+      if (say && Romanize.rr(ko) === rom) errors.push(`Number set "${set.title}": ${ko} doesn't need a spoken spelling`);
+      if (verbose) console.log(`  ${n} ${ko}: ${rom}`);
+    });
+    if (!set.cards || !set.cards.length) errors.push(`Number set "${set.title}" needs teaching cards`);
+  } else {
+    set.words.forEach(ko => { if (!Curriculum.word(ko)) errors.push(`Word set "${set.title}": ${ko} is not in words.js`); });
+  }
+  const words = Curriculum.setWords(set);
+  if (words.length < 4) errors.push(`Word set "${set.title}" needs at least 4 words`);
+  words.forEach(w => { if (w && !isFinite(w.round)) errors.push(`Word set "${set.title}": ${w.ko} uses a letter that is never introduced`); });
+});
+console.log(`Word sets: ${VOCAB_SETS.length}`);
 
 warnings.forEach(w => console.log('WARNING: ' + w));
 errors.forEach(e => console.log('ERROR: ' + e));

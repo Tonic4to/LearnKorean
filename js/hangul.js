@@ -96,7 +96,7 @@ var Hangul = (function () {
     function render(c) { return c.l && c.v ? compose(c.l, c.v, c.t || '') : (c.l || c.v); }
     function flush() { if (cur) out += render(cur); cur = null; }
     seq.forEach(function (j) {
-      if (j === ' ') { flush(); out += ' '; return; }
+      if (j === ' ' || !(isVowel(j) || isConsonant(j))) { flush(); out += j; return; }
       if (isVowel(j)) {
         if (cur && cur.l && !cur.v) { cur.v = j; return; }
         if (cur && cur.v && !cur.t && combineVowel(cur.v, j)) { cur.v = combineVowel(cur.v, j); return; }
